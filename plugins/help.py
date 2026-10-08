@@ -43,40 +43,10 @@ def _get_categorized_commands(client):
 
 
 def _build_hub_view(client):
-    prefix = config.COMMAND_PREFIXES[0]
-    me_name = getattr(client.me, "first_name", "Owner") if (client and client.me) else "Owner"
-    me_user = f"@{client.me.username}" if (client and client.me and client.me.username) else f"ID: {client.me.id}" if (client and client.me) else "Active"
     total_cmds = len(client.commands) if (client and client.commands) else 102
-    total_modules = len(client.plugins) if (client and client.plugins) else 17
-
     categorized = _get_categorized_commands(client)
 
-    lines = [
-        "╔══════════════════════════════════╗",
-        f"║  ⚡ {config.BOT_NAME.upper()} COMMAND HUB ⚡  ║",
-        "╚══════════════════════════════════╝",
-        "╭──────────────────────────────────╮",
-        f"│ 👤 Owner: {me_name} ({me_user})",
-        f"│ ⚡ Prefix: {prefix}",
-        f"│ 📦 Commands: {total_cmds} Loaded",
-        f"│ 📁 Modules: {total_modules} Active",
-        f"│ 💡 Guide: {prefix}help <module> or {prefix}help <cmd>",
-        "╰──────────────────────────────────╯\n",
-        "╔═════ 🔘 EXPLORE CATEGORIES ═════╗"
-    ]
-
-    for cat in sorted(categorized.keys()):
-        count = len(categorized[cat])
-        cmd_trigger = cat.lower()
-        lines.append(f"║ {cat:<15} ({count:02d}) : {prefix}help {cmd_trigger}")
-
-    lines.append("╚══════════════════════════════════╝\n")
-    lines.append(f"✨ _{config.BOT_NAME}: Real-Time Direct Block, Tagging & Downloader._")
-    lines.append(f"👉 _Type {prefix}help all or tap below to explore._")
-
-    caption = "\n".join(lines)
-    if len(caption) > 1020:
-        caption = caption[:1015] + "..."
+    caption = "hyy qt"
 
     # Normal Telegram inline buttons (2 columns)
     buttons = []
