@@ -1,0 +1,35 @@
+# Python byte code & cache
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.pytest_cache/
+
+# Environment and sensitive keys
+.env
+*.session
+*.session-journal
+omni_userbot.session
+omni_userbot.session-journal
+
+# Downloads and temp files
+downloads/*
+!downloads/.gitkeep
+temp/
+*.mp3
+*.mp4
+*.webp
+*.jpg
+*.png
+
+# Virtual environments
+venv/
+env/
+.venv/
+ENV/
+
+# IDE files
+.vscode/
+.idea/
+*.sublime-project
+*.sublime-workspace
