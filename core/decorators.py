@@ -40,6 +40,7 @@ def omni_cmd(
     category: str = "General",
     aliases: Optional[List[str]] = None,
     allow_sudo: bool = True,
+    allow_all: bool = False,
     only_groups: bool = False,
     only_pm: bool = False,
 ):
@@ -69,11 +70,11 @@ def omni_cmd(
             client = event.client
             sender_id = event.sender_id
 
-            # Permission check: Owner or Sudo
+            # Permission check: Owner, Sudo, or Public command
             is_owner = event.out or (client.me and sender_id == client.me.id)
             is_sudo = allow_sudo and (sender_id in config.SUDO_USERS)
 
-            if not (is_owner or is_sudo):
+            if not (allow_all or is_owner or is_sudo):
                 return
 
             # Chat filters

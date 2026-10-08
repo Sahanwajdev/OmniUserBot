@@ -52,27 +52,19 @@ async def youtube_search(event):
         await msg.edit(f"❌ YouTube Search error: `{e}`")
 
 
-@omni_cmd(
-    pattern="ytdl",
-    desc="Downloads YouTube video or audio by URL or song name using yt-dlp.",
-    usage=".ytdl <url or search query> [audio/video]",
-    category="Media",
-    aliases=["ytdlp", "song", "video", "yta"]
-)
-async def youtube_download(event):
-    query = event.text_args.strip()
-    if not query:
-        await event.reply_or_edit("📥 **Usage:** `.ytdl <url or song name>`\nExamples:\n• `.ytdl tum hi ho`\n• `.ytdl https://youtu.be/... audio`")
+async def _download_and_send_yt(event, query: str, is_audio: bool):
+    clean_query = query.strip()
+    if not clean_query:
+        cmd_type = "song or audio URL" if is_audio else "video name or URL"
+        await event.reply_or_edit(f"📥 **Usage:** Provide a YouTube link or search query for {cmd_type}.")
         return
 
-    # Check if audio format requested
-    cmd_name = (event.raw_text or "").split()[0].lstrip("".join(config.COMMAND_PREFIXES)).lower()
-    is_audio = cmd_name in ("song", "yta") or "audio" in query.lower()
-
-    # Clean query if 'audio' was passed at the end
-    clean_query = query
-    if is_audio and clean_query.lower().endswith(" audio"):
-        clean_query = clean_query[:-6].strip()
+    # Remove trailing/leading format hints if present
+    for hint in ("audio", "mp3", "video", "mp4"):
+        if clean_query.lower().endswith(f" {hint}"):
+            clean_query = clean_query[:-(len(hint) + 1)].strip()
+        elif clean_query.lower().startswith(f"{hint} "):
+            clean_query = clean_query[len(hint) + 1:].strip()
 
     # Determine whether input is URL or search query
     target = clean_query
@@ -142,7 +134,8 @@ async def youtube_download(event):
                 event.chat_id,
                 file=actual_file,
                 caption=f"🎥 **{title}**\n👤 `{uploader}`",
-                reply_to=event.id
+                reply_to=event.id,
+                supports_streaming=True
             )
 
         if event.out:
@@ -154,6 +147,51 @@ async def youtube_download(event):
             os.remove(actual_file)
     except Exception as e:
         await msg.edit(f"❌ Failed to download/send media: `{e}`")
+
+
+@omni_cmd(
+    pattern="song",
+    desc="Downloads and sends high-quality YouTube song/audio as MP3.",
+    usage=".song <song name or url>",
+    category="Media",
+    aliases=["yta", "audio", "music"]
+)
+async def song_download(event):
+    await _download_and_send_yt(event, event.text_args, is_audio=True)
+
+
+@omni_cmd(
+    pattern="video",
+    desc="Downloads and sends YouTube video as streamable MP4.",
+    usage=".video <video name or url>",
+    category="Media",
+    aliases=["ytv", "ytvideo"]
+)
+async def video_download(event):
+    await _download_and_send_yt(event, event.text_args, is_audio=False)
+
+
+@omni_cmd(
+    pattern="ytdl",
+    desc="Downloads YouTube media (Defaults to Audio; add 'video' for MP4).",
+    usage=".ytdl <song or url> [video]",
+    category="Media",
+    aliases=["ytdlp"]
+)
+async def youtube_download(event):
+    query = event.text_args.strip()
+    if not query:
+        await event.reply_or_edit(
+            "📥 **Usage:** `.ytdl <song or url>` (Defaults to Audio)\n"
+            "• `.song <name>` — Download MP3 Audio\n"
+            "• `.video <name>` — Download MP4 Video\n"
+            "• `.ytdl <name> video` — Download Video via ytdl"
+        )
+        return
+
+    # Check if video was explicitly requested; default is AUDIO
+    is_video = "video" in query.lower() or "mp4" in query.lower()
+    await _download_and_send_yt(event, query, is_audio=not is_video)
 
 
 @omni_cmd(
