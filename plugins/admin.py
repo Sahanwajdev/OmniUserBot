@@ -3,6 +3,7 @@ from telethon.tl.types import ChatBannedRights, ChatAdminRights
 from telethon.errors import ChatAdminRequiredError, UserAdminInvalidError
 from core.decorators import omni_cmd
 from helpers.telegram_tools import get_target_user, parse_time_delta
+from config import config
 
 
 @omni_cmd(
@@ -349,3 +350,104 @@ async def clean_zombies(event):
             pass
 
     await msg.edit(f"🧹 **Cleaned {removed} / {len(zombies)} deleted accounts!**")
+
+
+@omni_cmd(
+    pattern="leaveall",
+    desc="Leaves all groups and channels that you did not create, preserving your owned chats.",
+    usage=".leaveall [preview/groups/channels]",
+    category="Admin",
+    aliases=["leaveallnonowned", "cleanleft", "purgegroups", "leavegroups", "leavechannels"]
+)
+async def leave_all_non_owned(event):
+    client = event.client
+    raw_text = (event.raw_text or "").lower()
+    args = event.text_args.lower().strip()
+    cmd_name = raw_text.split()[0].lstrip("".join(config.COMMAND_PREFIXES)).lower()
+
+    only_groups = "groups" in args or cmd_name == "leavegroups"
+    only_channels = "channels" in args or cmd_name == "leavechannels"
+    is_preview = "preview" in args or "list" in args
+
+    msg = await event.reply_or_edit("🔍 **Scanning all joined groups and channels...**")
+
+    to_leave = []
+    owned_chats = []
+
+    async for dialog in client.iter_dialogs():
+        # Only process channels and groups
+        if not (dialog.is_channel or dialog.is_group):
+            continue
+
+        # NEVER leave your configured log chat
+        if config.LOG_CHAT_ID and dialog.id == config.LOG_CHAT_ID:
+            owned_chats.append((dialog.name, dialog.id, "Log Chat"))
+            continue
+
+        entity = dialog.entity
+        is_creator = getattr(entity, "creator", False)
+
+        # NEVER leave channels or groups created by you
+        if is_creator:
+            owned_chats.append((dialog.name, dialog.id, "Created by You"))
+            continue
+
+        # Filter by type if requested
+        if only_groups and not dialog.is_group:
+            continue
+        if only_channels and dialog.is_group:
+            continue
+
+        to_leave.append(dialog)
+
+    if not to_leave:
+        await msg.edit(f"✅ **No non-owned chats found to leave.**\n🛡️ **Preserved {len(owned_chats)} owned chats.**")
+        return
+
+    if is_preview:
+        preview_text = [f"📋 **Found {len(to_leave)} non-owned chats that would be left:**\n"]
+        for d in to_leave[:15]:
+            chat_type = "Group" if d.is_group else "Channel"
+            preview_text.append(f"• [{chat_type}] `{d.name}` (`{d.id}`)")
+        if len(to_leave) > 15:
+            preview_text.append(f"\n_...and {len(to_leave) - 15} more chats._")
+        preview_text.append(f"\n🛡️ **{len(owned_chats)} owned chats are protected.**")
+        preview_text.append("\n👉 Run `.leaveall` to execute the rapid leave.")
+        await msg.edit("\n".join(preview_text))
+        return
+
+    await msg.edit(
+        f"🚀 **Leaving {len(to_leave)} non-owned chats...**\n"
+        f"🛡️ _Preserving {len(owned_chats)} owned channels/groups._"
+    )
+
+    left_count = 0
+    failed_count = 0
+
+    for dialog in to_leave:
+        try:
+            await client.delete_dialog(dialog.entity)
+            left_count += 1
+            # Rapid 0.2s pause for real-time speed while respecting Telegram limits
+            await asyncio.sleep(0.2)
+        except Exception as e:
+            from telethon.errors import FloodWaitError
+            if isinstance(e, FloodWaitError):
+                await asyncio.sleep(e.seconds)
+                try:
+                    await client.delete_dialog(dialog.entity)
+                    left_count += 1
+                except Exception:
+                    failed_count += 1
+            else:
+                failed_count += 1
+
+    summary = (
+        f"🧹 **Cleanup Completed in Rapid Time!**\n\n"
+        f"• **Chats Left:** `{left_count}`\n"
+        f"• **Failed / Unreachable:** `{failed_count}`\n"
+        f"• **Your Owned Chats Preserved:** `{len(owned_chats)}` 🛡️\n"
+        f"• **Log Chat Preserved:** `Safe` 🔒"
+    )
+    await msg.edit(summary)
+

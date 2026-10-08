@@ -86,13 +86,23 @@ async def youtube_download(event):
     opts = {
         "outtmpl": out_tmpl,
         "quiet": True,
-        "max_filesize": 50 * 1024 * 1024,  # 50MB telegram upload limit
         "noplaylist": True,
+        "extractor_args": {
+            "youtube": {
+                "player_client": ["android", "ios"]
+            }
+        }
     }
     if is_audio:
-        opts["format"] = "bestaudio/best"
+        opts["format"] = "bestaudio/ba/b"
+        opts["postprocessors"] = [{
+            "key": "FFmpegExtractAudio",
+            "preferredcodec": "mp3",
+            "preferredquality": "192",
+        }]
     else:
-        opts["format"] = "best[ext=mp4]/best"
+        opts["format"] = "bestvideo[height<=720]+bestaudio/best[height<=720]/b/best"
+        opts["merge_output_format"] = "mp4"
 
     try:
         loop = asyncio.get_event_loop()
@@ -102,7 +112,17 @@ async def youtube_download(event):
                 info = info["entries"][0]
             filename = ydl.prepare_filename(info)
 
-        if not os.path.exists(filename):
+        base, _ = os.path.splitext(filename)
+        candidates = [
+            f"{base}.mp3" if is_audio else f"{base}.mp4",
+            f"{base}.mp4",
+            f"{base}.m4a",
+            f"{base}.webm",
+            filename
+        ]
+        actual_file = next((f for f in candidates if os.path.exists(f)), None)
+
+        if not actual_file:
             await msg.edit("❌ Download finished but file was not found.")
             return
 
@@ -113,14 +133,14 @@ async def youtube_download(event):
         if is_audio:
             await event.client.send_file(
                 event.chat_id,
-                file=filename,
+                file=actual_file,
                 caption=f"🎵 **{title}**\n👤 `{uploader}`",
                 reply_to=event.id
             )
         else:
             await event.client.send_file(
                 event.chat_id,
-                file=filename,
+                file=actual_file,
                 caption=f"🎥 **{title}**\n👤 `{uploader}`",
                 reply_to=event.id
             )
@@ -130,8 +150,8 @@ async def youtube_download(event):
         else:
             await msg.delete()
 
-        if os.path.exists(filename):
-            os.remove(filename)
+        if os.path.exists(actual_file):
+            os.remove(actual_file)
     except Exception as e:
         await msg.edit(f"❌ Failed to download/send media: `{e}`")
 
