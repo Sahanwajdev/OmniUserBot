@@ -187,7 +187,7 @@ async def help_menu(event):
     if getattr(client, "tgbot", None) and config.BOT_USERNAME:
         try:
             bot_user = config.BOT_USERNAME.lstrip("@")
-            inline_q = f"help:{query}" if query else "help"
+            inline_q = f"help:{query}" if (query and query != "help") else "help_hub"
             results = await client.inline_query(bot_user, inline_q)
             if results:
                 reply_to = None
@@ -204,7 +204,14 @@ async def help_menu(event):
             pass
 
     # Fallback to direct client rendering if inline bot is unavailable
-    if query and query != "all":
+    if query and query not in ("all", "help"):
+        # Check category first
+        cat_key = query.replace(" ", "_").replace("&", "and")
+        cat_text, cat_btns = _build_category_view(client, cat_key)
+        if cat_text:
+            await event.reply_or_edit(cat_text, buttons=cat_btns)
+            return
+
         # Check command
         found_cmd = None
         for name, meta in client.commands.items():
@@ -214,13 +221,6 @@ async def help_menu(event):
         if found_cmd:
             man_text, man_btns = _build_command_manual(client, found_cmd)
             await event.reply_or_edit(man_text, buttons=man_btns)
-            return
-
-        # Check category
-        cat_key = query.replace(" ", "_").replace("&", "and")
-        cat_text, cat_btns = _build_category_view(client, cat_key)
-        if cat_text:
-            await event.reply_or_edit(cat_text, buttons=cat_btns)
             return
 
     if query == "all":
@@ -268,10 +268,13 @@ async def help_inline_query_handler(event):
     else:
         sub = query
 
-    if sub == "all":
+    if not sub or sub in ("help", "help_hub", "hub", "home", "main"):
+        text, btns = _build_hub_view(client)
+        title = f"{config.BOT_NAME} Command Hub"
+    elif sub == "all":
         text, btns = _build_all_view(client)
         title = f"{config.BOT_NAME} — All Commands"
-    elif sub:
+    else:
         # Category lookup
         cat_key = sub.replace(" ", "_").replace("&", "and")
         cat_text, cat_btns = _build_category_view(client, cat_key)
@@ -279,9 +282,9 @@ async def help_inline_query_handler(event):
             text, btns = cat_text, cat_btns
             title = f"{config.BOT_NAME} — {sub.title()} Commands"
         else:
-            # Command manual lookup
+            # Command manual lookup (only for commands other than 'help')
             found_cmd = None
-            if client and client.commands:
+            if client and client.commands and sub != "help":
                 for name, meta in client.commands.items():
                     if sub == name.lower() or sub in [a.lower() for a in meta.get("aliases", [])]:
                         found_cmd = meta
@@ -292,9 +295,6 @@ async def help_inline_query_handler(event):
             else:
                 text, btns = _build_hub_view(client)
                 title = f"{config.BOT_NAME} Command Hub"
-    else:
-        text, btns = _build_hub_view(client)
-        title = f"{config.BOT_NAME} Command Hub"
 
     try:
         res = builder.photo(
