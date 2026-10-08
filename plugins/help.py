@@ -6,8 +6,11 @@ from core.decorators import omni_cmd
 from config import config
 import core.client as client_module
 
-HELP_IMAGE_URL = "https://files.catbox.moe/rhzor8.jpg"
+HELP_IMAGE_URL = "https://files.catbox.moe/iiwd58.jpg"
 HELP_LOCAL_PATH = config.DOWNLOAD_DIR / "help_banner.jpg"
+
+# Tracks active help message IDs -> chat_id for real-time deletion
+ACTIVE_HELP_MENUS = {}
 
 
 async def get_help_media():
@@ -17,7 +20,8 @@ async def get_help_media():
     try:
         from helpers.http_client import http_client
         session = await http_client.get_session()
-        async with session.get(HELP_IMAGE_URL) as resp:
+        headers = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)"}
+        async with session.get(HELP_IMAGE_URL, headers=headers) as resp:
             if resp.status == 200:
                 content = await resp.read()
                 HELP_LOCAL_PATH.write_bytes(content)
@@ -48,23 +52,35 @@ def _build_hub_view(client):
 
     caption = "hyy qt"
 
-    # Normal Telegram inline buttons (2 columns)
+    # Modern 3-column inline button layout
+    grid_cats = [
+        "Admin", "Media", "Security",
+        "Tools", "Tagger", "Profile",
+        "Web Search", "Fun", "Notes & Filters",
+        "System", "Developer", "Automation",
+        "General"
+    ]
+
     buttons = []
     row = []
-    for cat in sorted(categorized.keys()):
-        count = len(categorized[cat])
-        safe_key = cat.lower().replace(" ", "_").replace("&", "and")
-        cb_data = f"hcat_{safe_key}".encode("utf-8")[:64]
-        row.append(Button.inline(f"{cat} ({count:02d})", cb_data))
-        if len(row) == 2:
-            buttons.append(row)
-            row = []
+    for cat in grid_cats:
+        if cat in categorized:
+            count = len(categorized[cat])
+            short_name = "Notes" if cat == "Notes & Filters" else ("Search" if cat == "Web Search" else cat)
+            safe_key = cat.lower().replace(" ", "_").replace("&", "and")
+            cb_data = f"hcat_{safe_key}".encode("utf-8")[:64]
+            row.append(Button.inline(f"{short_name} ({count:02d})", cb_data))
+            if len(row) == 3:
+                buttons.append(row)
+                row = []
 
     if row:
+        row.append(Button.inline(f"All ({total_cmds})", b"hcat_all"))
         buttons.append(row)
+    else:
+        buttons.append([Button.inline(f"All Commands ({total_cmds})", b"hcat_all")])
 
     buttons.append([
-        Button.inline(f"All Commands ({total_cmds})", b"hcat_all"),
         Button.inline("Close Menu", b"h_close")
     ])
 
@@ -196,7 +212,10 @@ async def help_menu(event):
                 elif event.reply_to_msg_id:
                     reply_to = event.reply_to_msg_id
 
-                await results[0].click(event.chat_id, reply_to=reply_to)
+                msg = await results[0].click(event.chat_id, reply_to=reply_to)
+                if msg and hasattr(msg, "id"):
+                    ACTIVE_HELP_MENUS[msg.id] = event.chat_id
+
                 if event.out:
                     await event.delete()
                 return
@@ -234,20 +253,24 @@ async def help_menu(event):
     try:
         if event.out:
             await event.delete()
-            await client.send_file(
+            sent_msg = await client.send_file(
                 event.chat_id,
                 file=media,
                 caption=hub_text,
                 buttons=hub_btns
             )
+            if sent_msg:
+                ACTIVE_HELP_MENUS[sent_msg.id] = event.chat_id
         else:
-            await client.send_file(
+            sent_msg = await client.send_file(
                 event.chat_id,
                 file=media,
                 caption=hub_text,
                 reply_to=event.id,
                 buttons=hub_btns
             )
+            if sent_msg:
+                ACTIVE_HELP_MENUS[sent_msg.id] = event.chat_id
     except Exception:
         await event.reply_or_edit(hub_text, buttons=hub_btns)
 
@@ -329,10 +352,26 @@ async def help_callback_handler(event):
         is_owner = (client and client.me and sender_id == client.me.id)
         is_sudo = sender_id in config.SUDO_USERS
         if is_owner or is_sudo:
-            try:
-                await event.delete()
-            except Exception:
-                pass
+            deleted = False
+            msg_id = getattr(event, "message_id", None)
+            if msg_id and client:
+                chat_id = ACTIVE_HELP_MENUS.get(msg_id)
+                if chat_id:
+                    try:
+                        await client.delete_messages(chat_id, [msg_id])
+                        deleted = True
+                        ACTIVE_HELP_MENUS.pop(msg_id, None)
+                    except Exception:
+                        pass
+            if not deleted:
+                try:
+                    await event.edit("🔒 _Help menu closed._", buttons=None)
+                except Exception:
+                    try:
+                        await event.delete()
+                    except Exception:
+                        pass
+            await event.answer("Help menu closed.")
         else:
             await event.answer("⚠️ Only the bot owner can close this menu.", alert=True)
         return
