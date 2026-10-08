@@ -2,6 +2,12 @@ import logging
 import sys
 from datetime import datetime
 
+if hasattr(sys.stdout, "reconfigure"):
+    try:
+        sys.stdout.reconfigure(encoding="utf-8", errors="replace")
+    except Exception:
+        pass
+
 try:
     from colorama import Fore, Style, init
     init(autoreset=True)

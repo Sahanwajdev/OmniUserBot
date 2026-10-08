@@ -40,7 +40,11 @@ def load_plugins(client) -> int:
                 if not callable(attr):
                     continue
 
-                if hasattr(attr, "event_filter"):
+                if hasattr(attr, "bot_event_filter") and getattr(client, "tgbot", None):
+                    client.tgbot.add_event_handler(attr, attr.bot_event_filter)
+                    LOADED_HANDLERS.append((client.tgbot, attr))
+                    registered_in_module += 1
+                elif hasattr(attr, "event_filter"):
                     client.add_event_handler(attr, attr.event_filter)
                     LOADED_HANDLERS.append(attr)
                     registered_in_module += 1
@@ -68,7 +72,11 @@ def reload_plugins(client) -> int:
 
     for handler in LOADED_HANDLERS:
         try:
-            client.remove_event_handler(handler)
+            if isinstance(handler, tuple):
+                tg_cli, h_func = handler
+                tg_cli.remove_event_handler(h_func)
+            else:
+                client.remove_event_handler(handler)
         except Exception:
             pass
 

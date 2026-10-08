@@ -46,6 +46,19 @@ class OmniClient(TelegramClient):
             retry_delay=1,
         )
 
+        # Assistant bot client for inline queries and inline keyboard buttons
+        self.tgbot: Optional[TelegramClient] = None
+        if config.BOT_TOKEN:
+            self.tgbot = TelegramClient(
+                session=str(config.BASE_DIR / "omni_tgbot"),
+                api_id=config.API_ID,
+                api_hash=config.API_HASH,
+                sequential_updates=True,
+                auto_reconnect=True,
+                retry_delay=1,
+            )
+            log.info("Assistant bot client initialized.")
+
     async def init_client(self):
         """Connects and caches the current authenticated user."""
         self.me = await self.get_me()
@@ -64,6 +77,27 @@ class OmniClient(TelegramClient):
                 )
             except Exception as e:
                 log.warning(f"Could not send startup log to LOG_CHAT_ID: {e}")
+
+    async def start_assistant_bot(self):
+        """Starts the assistant bot client for inline queries and inline buttons."""
+        if self.tgbot and config.BOT_TOKEN:
+            try:
+                await self.tgbot.start(bot_token=config.BOT_TOKEN)
+                bot_me = await self.tgbot.get_me()
+                log.info(f"Assistant Bot online: @{bot_me.username} [ID: {bot_me.id}]")
+                if not config.BOT_USERNAME:
+                    config.BOT_USERNAME = bot_me.username
+            except Exception as e:
+                log.error(f"Failed to start assistant bot: {e}")
+
+    async def disconnect(self):
+        """Disconnects both user client and assistant bot client."""
+        if self.tgbot and self.tgbot.is_connected():
+            try:
+                await self.tgbot.disconnect()
+            except Exception:
+                pass
+        return await super().disconnect()
 
     @property
     def uptime_seconds(self) -> float:

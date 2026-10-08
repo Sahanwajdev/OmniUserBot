@@ -64,6 +64,10 @@ class Config:
     ALIVE_EMOJI = os.getenv("ALIVE_EMOJI", "⚡").strip()
     ALIVE_TEXT = os.getenv("ALIVE_TEXT", "OmniUserBot is online and ultra-fast.").strip()
 
+    # Assistant Bot for Inline Features & Buttons
+    BOT_TOKEN = os.getenv("BOT_TOKEN", "").strip() or None
+    BOT_USERNAME = os.getenv("BOT_USERNAME", "").strip() or None
+
     # Max Telegram text message length
     MAX_MESSAGE_LENGTH = 4096
 

@@ -69,6 +69,9 @@ async def main():
     # Cache user profile and send log notification
     await bot.init_client()
 
+    # Start assistant bot for inline queries and inline buttons
+    await bot.start_assistant_bot()
+
     # Load all plugins
     loaded_count = load_plugins(bot)
     log.info(f"Successfully loaded {loaded_count} plugin modules with {len(bot.commands)} commands.")
