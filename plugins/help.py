@@ -1,32 +1,138 @@
 from collections import defaultdict
-from telethon import Button
+from telethon import Button, events
 from core.decorators import omni_cmd
 from config import config
 
-CATEGORY_ICONS = {
-    "Security": "🛡️",
-    "Admin": "👮",
-    "Tagger": "👥",
-    "Media": "🎥",
-    "Web Search": "🔍",
-    "Scrapers": "🌐",
-    "Tools": "🛠️",
-    "Notes & Filters": "📝",
-    "Profile": "🎭",
-    "Locks": "🔒",
-    "Fun": "🕹️",
-    "Memes": "😹",
-    "System": "⚙️",
-    "Automation": "⏰",
-    "General": "📦",
-    "Account Security": "🔐",
-}
+
+def _get_categorized_commands(client):
+    categorized = defaultdict(list)
+    for name, meta in client.commands.items():
+        cat = meta.get("category", "General")
+        categorized[cat].append(meta)
+    return categorized
+
+
+def _build_hub_view(client):
+    prefix = config.COMMAND_PREFIXES[0]
+    me_name = getattr(client.me, "first_name", "Owner") if client.me else "Owner"
+    me_user = f"@{client.me.username}" if (client.me and client.me.username) else f"ID: {client.me.id}" if client.me else "Active"
+    total_cmds = len(client.commands)
+    total_modules = len(client.plugins)
+
+    text = (
+        "╔══════════════════════════════════╗\n"
+        f"║     {config.BOT_NAME.upper()} COMMAND HUB      ║\n"
+        "╚══════════════════════════════════╝\n"
+        "╭──────────────────────────────────╮\n"
+        f"│ Owner: {me_name} ({me_user})\n"
+        f"│ Prefix: {prefix}\n"
+        f"│ Total Commands: {total_cmds} Loaded\n"
+        f"│ Modules: {total_modules} Active\n"
+        "│ Guide: Tap any category button below\n"
+        "╰──────────────────────────────────╯"
+    )
+
+    categorized = _get_categorized_commands(client)
+    sorted_cats = sorted(categorized.keys())
+
+    # Build 2-column colored button grid
+    buttons = []
+    row = []
+    styles = ["primary", "success"]
+
+    for idx, cat in enumerate(sorted_cats):
+        cmd_count = len(categorized[cat])
+        style = styles[idx % 2]
+        cat_key = cat.lower().replace(" ", "_").replace("&", "and")
+        cb_data = f"hcat_{cat_key}".encode("utf-8")[:64]
+
+        row.append(Button.inline(f"{cat} ({cmd_count:02d})", cb_data, style=style))
+        if len(row) == 2:
+            buttons.append(row)
+            row = []
+
+    if row:
+        buttons.append(row)
+
+    # Bottom utility row
+    buttons.append([
+        Button.inline(f"All Commands ({total_cmds})", b"hcat_all", style="success"),
+        Button.inline("Close Menu", b"h_close", style="danger")
+    ])
+
+    return text, buttons
+
+
+def _build_category_view(client, cat_key: str):
+    prefix = config.COMMAND_PREFIXES[0]
+    categorized = _get_categorized_commands(client)
+
+    # Find matching category
+    matched_cat = None
+    for cat in categorized:
+        normalized = cat.lower().replace(" ", "_").replace("&", "and")
+        if normalized == cat_key or cat.lower() == cat_key.replace("_", " "):
+            matched_cat = cat
+            break
+
+    if not matched_cat:
+        return None, None
+
+    cmds = categorized[matched_cat]
+    out = [
+        "╔══════════════════════════════════╗",
+        f"║       {matched_cat.upper()} COMMANDS ({len(cmds):02d})",
+        "╚══════════════════════════════════╝",
+        "╭──────────────────────────────────╮",
+        f"│ Category: {matched_cat}",
+        f"│ Available Commands: {len(cmds)}",
+        f"│ Type {prefix}help <cmd> for detail",
+        "╰──────────────────────────────────╯\n"
+    ]
+
+    for m in sorted(cmds, key=lambda x: x["name"]):
+        desc = m.get("description", "No description.")
+        out.append(f"• `{prefix}{m['name']}` — _{desc}_")
+
+    buttons = [
+        [
+            Button.inline("Back to Categories", b"h_home", style="primary"),
+            Button.inline("Close", b"h_close", style="danger")
+        ]
+    ]
+
+    return "\n".join(out), buttons
+
+
+def _build_all_view(client):
+    prefix = config.COMMAND_PREFIXES[0]
+    categorized = _get_categorized_commands(client)
+    total_cmds = len(client.commands)
+
+    out = [
+        f"**{config.BOT_NAME} — Complete Commands Index**\n",
+        f"• Active Prefix: `{prefix}`",
+        f"• Total Commands: `{total_cmds}`\n"
+    ]
+
+    for cat, cmd_metas in sorted(categorized.items()):
+        names = "  ".join([f"`{prefix}{c['name']}`" for c in sorted(cmd_metas, key=lambda x: x["name"])])
+        out.append(f"**{cat}** ({len(cmd_metas)}):\n{names}\n")
+
+    buttons = [
+        [
+            Button.inline("Back to Categories", b"h_home", style="primary"),
+            Button.inline("Close", b"h_close", style="danger")
+        ]
+    ]
+
+    return "\n".join(out), buttons
 
 
 @omni_cmd(
     pattern="help",
-    desc="Shows all available modules and commands, or detailed help for a specific command.",
-    usage=".help [module/command/all]",
+    desc="Opens the interactive colorful category command hub.",
+    usage=".help [category/command/all]",
     category="General",
     allow_all=True
 )
@@ -35,16 +141,9 @@ async def help_menu(event):
     query = event.text_args.strip().lower()
     prefix = config.COMMAND_PREFIXES[0]
 
-    # Map categories and command lookup
-    categorized = defaultdict(list)
-    cat_lookup = {}
-    for name, meta in client.commands.items():
-        cat = meta.get("category", "General")
-        categorized[cat].append(meta)
-        cat_lookup[cat.lower()] = cat
-
-    # Case 1: Specific Command Manual
-    if query and query != "all" and query not in cat_lookup:
+    # Case 1: Specific Command Manual (.help <command>)
+    if query and query != "all":
+        # Check if query matches a command name or alias
         found_cmd = None
         for name, meta in client.commands.items():
             if query == name.lower() or query in [a.lower() for a in meta.get("aliases", [])]:
@@ -52,22 +151,21 @@ async def help_menu(event):
                 break
 
         if found_cmd:
-            cat_icon = CATEGORY_ICONS.get(found_cmd.get("category", ""), "📌")
             aliases_str = ", ".join([f"`{prefix}{a}`" for a in found_cmd.get("aliases", [])]) or "None"
             manual = (
-                f"╔══════════════════════════════╗\n"
-                f"║  📖 𝗖𝗢𝗠𝗠𝗔𝗡𝗗 𝗠𝗔𝗡𝗨𝗔𝗟: `{found_cmd['name'].upper()}`\n"
-                f"╚══════════════════════════════╝\n\n"
-                f"• {cat_icon} **Category:** `{found_cmd['category']}`\n"
-                f"• 📝 **Description:** {found_cmd['description']}\n"
-                f"• 💡 **Usage:** `{found_cmd['usage']}`\n"
-                f"• 🏷️ **Aliases:** {aliases_str}\n\n"
+                "╔══════════════════════════════════╗\n"
+                f"║  COMMAND MANUAL: `{found_cmd['name'].upper()}`\n"
+                "╚══════════════════════════════════╝\n\n"
+                f"• **Category:** `{found_cmd['category']}`\n"
+                f"• **Description:** {found_cmd['description']}\n"
+                f"• **Usage:** `{found_cmd['usage']}`\n"
+                f"• **Aliases:** {aliases_str}\n\n"
                 f"🔙 _Run `{prefix}help` to view all categories._"
             )
             buttons = [
                 [
-                    Button.url("🐙 GitHub Repository", "https://github.com/Sahanwajdev/OmniUserBot"),
-                    Button.url("💬 Commands Guide", "https://github.com/Sahanwajdev/OmniUserBot#readme")
+                    Button.inline("Back to Categories", b"h_home", style="primary"),
+                    Button.inline("Close", b"h_close", style="danger")
                 ]
             ]
             try:
@@ -76,94 +174,75 @@ async def help_menu(event):
                 await event.reply_or_edit(manual)
             return
 
-    # Case 2: Specific Category Exploration (.help <category>)
-    if query in cat_lookup:
-        actual_cat = cat_lookup[query]
-        cmds = categorized[actual_cat]
-        cat_icon = CATEGORY_ICONS.get(actual_cat, "📁")
+        # Check if query matches a category name directly (.help <category>)
+        cat_key = query.replace(" ", "_").replace("&", "and")
+        cat_text, cat_buttons = _build_category_view(client, cat_key)
+        if cat_text:
+            try:
+                await event.reply_or_edit(cat_text, buttons=cat_buttons)
+            except Exception:
+                await event.reply_or_edit(cat_text)
+            return
 
-        out = [
-            f"╔══════════════════════════════╗",
-            f"║  {cat_icon} **{actual_cat.upper()} MODULE**",
-            f"╚══════════════════════════════╝",
-            f"╭──────────────────────────────╮",
-            f"│ 📂 Category: `{actual_cat}`",
-            f"│ 📦 Total Commands: `{len(cmds)}`",
-            f"│ 💡 Detailed info: `{prefix}help <cmd>`",
-            f"╰──────────────────────────────╯\n"
-        ]
-
-        for m in sorted(cmds, key=lambda x: x["name"]):
-            desc = m.get("description", "No description.")
-            out.append(f"• `{prefix}{m['name']}` — _{desc}_")
-
-        out.append(f"\n🔙 _Return to category menu: `{prefix}help`_")
-
-        buttons = [
-            [
-                Button.url("🐙 GitHub Repo", "https://github.com/Sahanwajdev/OmniUserBot"),
-                Button.url("⚡ Alive Check", "https://github.com/Sahanwajdev/OmniUserBot#readme")
-            ]
-        ]
-        try:
-            await event.reply_or_edit("\n".join(out), buttons=buttons)
-        except Exception:
-            await event.reply_or_edit("\n".join(out))
-        return
-
-    # Case 3: Show All Commands Index (.help all)
+    # Case 2: Full Command List (.help all)
     if query == "all":
-        out = [
-            f"⚡ **{config.BOT_NAME} — Complete Commands Index**\n",
-            f"• **Active Prefix:** `{prefix}`",
-            f"• **Total Commands:** `{len(client.commands)}`\n"
-        ]
-        for category, cmd_metas in sorted(categorized.items()):
-            cat_icon = CATEGORY_ICONS.get(category, "📁")
-            names = "  ".join([f"`{prefix}{c['name']}`" for c in sorted(cmd_metas, key=lambda x: x["name"])])
-            out.append(f"{cat_icon} **{category}** ({len(cmd_metas)}):\n{names}\n")
-
-        out.append(f"💡 _Syntax info: `{prefix}help <command>`_")
-        await event.reply_or_edit("\n".join(out))
+        all_text, all_buttons = _build_all_view(client)
+        try:
+            await event.reply_or_edit(all_text, buttons=all_buttons)
+        except Exception:
+            await event.reply_or_edit(all_text)
         return
 
-    # Case 4: Master Colorful Hub Menu (.help)
-    me_name = getattr(client.me, "first_name", "Owner") if client.me else "Owner"
-    me_user = f"@{client.me.username}" if (client.me and client.me.username) else f"ID: {client.me.id}" if client.me else "Active"
-    total_cmds = len(client.commands)
-    total_modules = len(client.plugins)
-
-    hub = [
-        "╔══════════════════════════════════╗",
-        f"║  ⚡ **{config.BOT_NAME.upper()} COMMAND HUB** ⚡  ║",
-        "╚══════════════════════════════════╝",
-        "╭──────────────────────────────────╮",
-        f"│ 👤 **Owner:** `{me_name}` ({me_user})",
-        f"│ ⚡ **Prefix:** `{prefix}`",
-        f"│ 📦 **Total Commands:** `{total_cmds}` Loaded",
-        f"│ 📁 **Modules:** `{total_modules}` Active",
-        f"│ 💡 **Guide:** `{prefix}help <module>` or `{prefix}help <cmd>`",
-        "╰──────────────────────────────────╯\n",
-        "╔═════ 🔘 **EXPLORE CATEGORIES** ═════╗"
-    ]
-
-    for category, cmd_metas in sorted(categorized.items()):
-        cat_icon = CATEGORY_ICONS.get(category, "📁")
-        cat_arg = category.lower()
-        hub.append(f"║ {cat_icon} **{category:<16}** `({len(cmd_metas):02d})` : `{prefix}help {cat_arg}`")
-
-    hub.append("╚══════════════════════════════════╝")
-    hub.append(f"\n✨ _OmniUserBot: Powered by Telethon with Real-Time Direct Block, Tagging & Downloader._")
-    hub.append(f"👉 _Type `{prefix}help all` to see full list at once._")
-
-    buttons = [
-        [
-            Button.url("🐙 GitHub Repository", "https://github.com/Sahanwajdev/OmniUserBot"),
-            Button.url("💬 Commands Guide", "https://github.com/Sahanwajdev/OmniUserBot#readme")
-        ]
-    ]
-
+    # Case 3: Master Colorful Category Hub (.help)
+    hub_text, hub_buttons = _build_hub_view(client)
     try:
-        await event.reply_or_edit("\n".join(hub), buttons=buttons)
+        await event.reply_or_edit(hub_text, buttons=hub_buttons)
     except Exception:
-        await event.reply_or_edit("\n".join(hub))
+        await event.reply_or_edit(hub_text)
+
+
+# Interactive Callback Query Handler for Colored Inline Buttons
+@events.register(events.CallbackQuery)
+async def help_callback_handler(event):
+    data = event.data.decode("utf-8") if event.data else ""
+    if not data.startswith("h"):
+        return
+
+    client = event.client
+
+    if data == "h_close":
+        try:
+            await event.delete()
+        except Exception:
+            pass
+        return
+
+    if data == "h_home":
+        hub_text, hub_buttons = _build_hub_view(client)
+        try:
+            await event.edit(hub_text, buttons=hub_buttons)
+        except Exception:
+            pass
+        return
+
+    if data == "hcat_all":
+        all_text, all_buttons = _build_all_view(client)
+        try:
+            await event.edit(all_text, buttons=all_buttons)
+        except Exception:
+            pass
+        return
+
+    if data.startswith("hcat_"):
+        cat_key = data[5:]
+        cat_text, cat_buttons = _build_category_view(client, cat_key)
+        if cat_text:
+            try:
+                await event.edit(cat_text, buttons=cat_buttons)
+            except Exception:
+                pass
+        return
+
+
+# Explicit event filter for Telethon plugin loader dispatching
+help_callback_handler.event_filter = events.CallbackQuery()
