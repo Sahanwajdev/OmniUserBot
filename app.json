@@ -1,0 +1,54 @@
+{
+  "name": "OmniUserBot",
+  "description": "High-Performance Modular Telegram Userbot with Real-Time Direct Blocking, Tagging, Downloader & Inline Help Hub.",
+  "repository": "https://github.com/Sahanwajdev/OmniUserBot",
+  "logo": "https://files.catbox.moe/iiwd58.jpg",
+  "keywords": ["telegram", "userbot", "telethon", "python", "modular"],
+  "stack": "container",
+  "env": {
+    "API_ID": {
+      "description": "Telegram API ID from https://my.telegram.org",
+      "required": true
+    },
+    "API_HASH": {
+      "description": "Telegram API HASH from https://my.telegram.org",
+      "required": true
+    },
+    "STRING_SESSION": {
+      "description": "Telethon String Session (generated via generate_session.py)",
+      "required": true
+    },
+    "BOT_TOKEN": {
+      "description": "Telegram Bot Token from @BotFather for Inline Keyboard Buttons",
+      "required": true
+    },
+    "BOT_USERNAME": {
+      "description": "Telegram Bot Username (without @)",
+      "required": true
+    },
+    "COMMAND_PREFIX": {
+      "description": "Command trigger prefix (default: .)",
+      "value": ".",
+      "required": false
+    },
+    "SUDO_USERS": {
+      "description": "Space-separated Telegram User IDs authorized to execute commands",
+      "required": false
+    },
+    "LOG_CHAT_ID": {
+      "description": "Telegram Group/Channel ID for activity logs",
+      "required": false
+    },
+    "BOT_NAME": {
+      "description": "Bot Name displayed across help menus and system info",
+      "value": "OmniUserBot",
+      "required": false
+    }
+  },
+  "formation": {
+    "worker": {
+      "quantity": 1,
+      "size": "free"
+    }
+  }
+}

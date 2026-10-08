@@ -1,0 +1,31 @@
+services:
+  - type: worker
+    name: OmniUserBot
+    env: python
+    region: oregon
+    plan: free
+    branch: main
+    buildCommand: pip install -U -r requirements.txt
+    startCommand: python main.py
+    autoDeploy: true
+    envVars:
+      - key: PYTHON_VERSION
+        value: 3.12.8
+      - key: API_ID
+        sync: false
+      - key: API_HASH
+        sync: false
+      - key: STRING_SESSION
+        sync: false
+      - key: BOT_TOKEN
+        sync: false
+      - key: BOT_USERNAME
+        sync: false
+      - key: COMMAND_PREFIX
+        value: "."
+      - key: BOT_NAME
+        value: "OmniUserBot"
+      - key: SUDO_USERS
+        sync: false
+      - key: LOG_CHAT_ID
+        sync: false
