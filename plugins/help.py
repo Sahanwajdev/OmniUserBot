@@ -1,7 +1,29 @@
+import os
 from collections import defaultdict
+from pathlib import Path
 from telethon import Button, events
 from core.decorators import omni_cmd
 from config import config
+
+HELP_IMAGE_URL = "https://files.catbox.moe/rhzor8.jpg"
+HELP_LOCAL_PATH = config.DOWNLOAD_DIR / "help_banner.jpg"
+
+
+async def get_help_media():
+    """Returns local cached banner or remote URL."""
+    if HELP_LOCAL_PATH.exists() and HELP_LOCAL_PATH.stat().st_size > 0:
+        return str(HELP_LOCAL_PATH)
+    try:
+        from helpers.http_client import http_client
+        session = await http_client.get_session()
+        async with session.get(HELP_IMAGE_URL) as resp:
+            if resp.status == 200:
+                content = await resp.read()
+                HELP_LOCAL_PATH.write_bytes(content)
+                return str(HELP_LOCAL_PATH)
+    except Exception:
+        pass
+    return HELP_IMAGE_URL
 
 
 def _get_categorized_commands(client):
@@ -19,34 +41,39 @@ def _build_hub_view(client):
     total_cmds = len(client.commands)
     total_modules = len(client.plugins)
 
-    text = (
-        "╔══════════════════════════════════╗\n"
-        f"║     {config.BOT_NAME.upper()} COMMAND HUB      ║\n"
-        "╚══════════════════════════════════╝\n"
-        "╭──────────────────────────────────╮\n"
-        f"│ Owner: {me_name} ({me_user})\n"
-        f"│ Prefix: {prefix}\n"
-        f"│ Total Commands: {total_cmds} Loaded\n"
-        f"│ Modules: {total_modules} Active\n"
-        "│ Guide: Tap any category button below\n"
-        "╰──────────────────────────────────╯"
-    )
-
     categorized = _get_categorized_commands(client)
-    sorted_cats = sorted(categorized.keys())
 
-    # Build 2-column colored button grid
+    lines = [
+        "╔══════════════════════════════════╗",
+        f"║     {config.BOT_NAME.upper()} COMMAND HUB      ║",
+        "╚══════════════════════════════════╝",
+        "╭──────────────────────────────────╮",
+        f"│ Owner: {me_name} ({me_user})",
+        f"│ Prefix: {prefix}",
+        f"│ Total Commands: {total_cmds} Loaded",
+        f"│ Modules: {total_modules} Active",
+        f"│ Guide: {prefix}help <module> or {prefix}help <cmd>",
+        "╰──────────────────────────────────╯\n",
+        "╔═════ 🔘 EXPLORE CATEGORIES ═════╗"
+    ]
+
+    for cat in sorted(categorized.keys()):
+        count = len(categorized[cat])
+        cmd_trigger = cat.lower()
+        lines.append(f"║ {cat:<18} ({count:02d}) : {prefix}help {cmd_trigger}")
+
+    lines.append("╚══════════════════════════════════╝\n")
+    lines.append(f"✨ _{config.BOT_NAME}: Real-Time Direct Block, Tagging & Downloader._")
+    lines.append(f"👉 _Type {prefix}help all to see full list at once._")
+
+    # Normal inline buttons (NO style parameters)
     buttons = []
     row = []
-    styles = ["primary", "success"]
-
-    for idx, cat in enumerate(sorted_cats):
-        cmd_count = len(categorized[cat])
-        style = styles[idx % 2]
-        cat_key = cat.lower().replace(" ", "_").replace("&", "and")
-        cb_data = f"hcat_{cat_key}".encode("utf-8")[:64]
-
-        row.append(Button.inline(f"{cat} ({cmd_count:02d})", cb_data, style=style))
+    for cat in sorted(categorized.keys()):
+        count = len(categorized[cat])
+        safe_key = cat.lower().replace(" ", "_").replace("&", "and")
+        cb_data = f"hcat_{safe_key}".encode("utf-8")[:64]
+        row.append(Button.inline(f"{cat} ({count:02d})", cb_data))
         if len(row) == 2:
             buttons.append(row)
             row = []
@@ -54,20 +81,18 @@ def _build_hub_view(client):
     if row:
         buttons.append(row)
 
-    # Bottom utility row
     buttons.append([
-        Button.inline(f"All Commands ({total_cmds})", b"hcat_all", style="success"),
-        Button.inline("Close Menu", b"h_close", style="danger")
+        Button.inline(f"All Commands ({total_cmds})", b"hcat_all"),
+        Button.inline("Close Menu", b"h_close")
     ])
 
-    return text, buttons
+    return "\n".join(lines), buttons
 
 
 def _build_category_view(client, cat_key: str):
     prefix = config.COMMAND_PREFIXES[0]
     categorized = _get_categorized_commands(client)
 
-    # Find matching category
     matched_cat = None
     for cat in categorized:
         normalized = cat.lower().replace(" ", "_").replace("&", "and")
@@ -94,10 +119,11 @@ def _build_category_view(client, cat_key: str):
         desc = m.get("description", "No description.")
         out.append(f"• `{prefix}{m['name']}` — _{desc}_")
 
+    # Normal inline buttons (NO style parameters)
     buttons = [
         [
-            Button.inline("Back to Categories", b"h_home", style="primary"),
-            Button.inline("Close", b"h_close", style="danger")
+            Button.inline("Back to Categories", b"h_home"),
+            Button.inline("Close Menu", b"h_close")
         ]
     ]
 
@@ -121,8 +147,8 @@ def _build_all_view(client):
 
     buttons = [
         [
-            Button.inline("Back to Categories", b"h_home", style="primary"),
-            Button.inline("Close", b"h_close", style="danger")
+            Button.inline("Back to Categories", b"h_home"),
+            Button.inline("Close Menu", b"h_close")
         ]
     ]
 
@@ -131,7 +157,7 @@ def _build_all_view(client):
 
 @omni_cmd(
     pattern="help",
-    desc="Opens the interactive colorful category command hub.",
+    desc="Opens the interactive help menu with photo banner and category buttons.",
     usage=".help [category/command/all]",
     category="General",
     allow_all=True
@@ -143,7 +169,6 @@ async def help_menu(event):
 
     # Case 1: Specific Command Manual (.help <command>)
     if query and query != "all":
-        # Check if query matches a command name or alias
         found_cmd = None
         for name, meta in client.commands.items():
             if query == name.lower() or query in [a.lower() for a in meta.get("aliases", [])]:
@@ -164,8 +189,8 @@ async def help_menu(event):
             )
             buttons = [
                 [
-                    Button.inline("Back to Categories", b"h_home", style="primary"),
-                    Button.inline("Close", b"h_close", style="danger")
+                    Button.inline("Back to Categories", b"h_home"),
+                    Button.inline("Close Menu", b"h_close")
                 ]
             ]
             try:
@@ -174,7 +199,7 @@ async def help_menu(event):
                 await event.reply_or_edit(manual)
             return
 
-        # Check if query matches a category name directly (.help <category>)
+        # Case 2: Specific Category (.help <category>)
         cat_key = query.replace(" ", "_").replace("&", "and")
         cat_text, cat_buttons = _build_category_view(client, cat_key)
         if cat_text:
@@ -184,7 +209,7 @@ async def help_menu(event):
                 await event.reply_or_edit(cat_text)
             return
 
-    # Case 2: Full Command List (.help all)
+    # Case 3: Show All Commands (.help all)
     if query == "all":
         all_text, all_buttons = _build_all_view(client)
         try:
@@ -193,15 +218,32 @@ async def help_menu(event):
             await event.reply_or_edit(all_text)
         return
 
-    # Case 3: Master Colorful Category Hub (.help)
+    # Case 4: Master Hub with Image Banner (https://files.catbox.moe/rhzor8.jpg)
     hub_text, hub_buttons = _build_hub_view(client)
+    media = await get_help_media()
+
     try:
-        await event.reply_or_edit(hub_text, buttons=hub_buttons)
+        if event.out:
+            await event.delete()
+            await client.send_file(
+                event.chat_id,
+                file=media,
+                caption=hub_text,
+                buttons=hub_buttons
+            )
+        else:
+            await client.send_file(
+                event.chat_id,
+                file=media,
+                caption=hub_text,
+                reply_to=event.id,
+                buttons=hub_buttons
+            )
     except Exception:
-        await event.reply_or_edit(hub_text)
+        # Fallback to text edit/reply
+        await event.reply_or_edit(hub_text, buttons=hub_buttons)
 
 
-# Interactive Callback Query Handler for Colored Inline Buttons
 @events.register(events.CallbackQuery)
 async def help_callback_handler(event):
     data = event.data.decode("utf-8") if event.data else ""
@@ -244,5 +286,4 @@ async def help_callback_handler(event):
         return
 
 
-# Explicit event filter for Telethon plugin loader dispatching
 help_callback_handler.event_filter = events.CallbackQuery()
