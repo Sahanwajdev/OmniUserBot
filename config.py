@@ -21,6 +21,10 @@ else:
 class Config:
     """Central configuration for OmniUserBot."""
 
+    BASE_DIR = BASE_DIR
+    DOWNLOAD_DIR = DOWNLOAD_DIR
+    PLUGIN_DIR = PLUGIN_DIR
+
     # Telegram API Credentials
     API_ID_RAW = os.getenv("API_ID", "").strip()
     try:

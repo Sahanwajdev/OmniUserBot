@@ -33,8 +33,11 @@ Most classic Telegram userbots on GitHub (CatUserBot, Paperplane, Ultroid, Userg
 
 ## 🚀 Key Features
 
-* 🌐 **Supercharged Web Suite:** DuckDuckGo instant search, Google search, Wikipedia deep extracts, GitHub repository & user inspection, StackOverflow developer search, real-time weather, live cryptocurrency tracking, Urban Dictionary, IP/domain geolocation, and instant web pasting.
-* 🛡️ **Group Moderation & Admin Powers:** High-speed bulk purge (up to 200 messages at once), auto-zombie cleaner (removes deleted accounts), ban, unban, timed mute, unmuting, admin listing, kick, and customizable promote titles.
+* 🌐 **Supercharged Web Suite:** DuckDuckGo instant search, Google search, Wikipedia deep extracts, GitHub repository & user inspection, StackOverflow developer search, lyrics scraper (Genius/DDG), news headlines, DNS over HTTPS, real-time weather, live cryptocurrency tracking, Urban Dictionary, IP/domain geolocation, URL shortener/expander, and instant web pasting.
+* 🛡️ **Group Moderation & Admin Powers:** High-speed bulk purge (up to 200 messages at once), granular chat permission locks (`.lock` / `.unlock` media, stickers, links, etc.), auto-zombie cleaner (removes deleted accounts), ban, unban, timed mute, unmuting, admin listing, kick, and customizable promote titles.
+* 🔒 **PMPermit Guardian & Security:** Auto-guards your direct messages against spam. Unapproved users get custom warnings and auto-blocked after exceeding limits. Full `.approve` and `.disapprove` controls.
+* 📝 **Persistent Notes & Chat Keyword Filters:** Save custom text/media snippets (`.save`, `.get`, `.notes`) and configure keyword triggers (`.filter`, `.stop`, `.filters`) that automatically reply when triggered.
+* 🎭 **Profile Controls & Cloning:** Change your name (`.setname`), bio (`.setbio`), profile photo (`.setpfp`), or temporarily clone any user's profile (`.clone`) and restore with `.revert`.
 * 🤖 **Smart AFK Mode:** Tracks time away from keyboard, automatically notifies anyone who mentions or private messages you with anti-flood rate limiting, and deactivates the moment you send a message.
 * 🛠️ **Utility & Media Tools:** Multi-language translation with fallback, Google Text-to-Speech audio notes, custom QR code generator, safe mathematical expression evaluator, sticker-to-image/image-to-sticker conversion, and direct YouTube search & download.
 * 💻 **Developer Execution:** Live asynchronous Python code REPL (`.eval`) with full Telegram client context and asynchronous terminal shell command runner (`.sh`).

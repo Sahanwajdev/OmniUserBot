@@ -13,21 +13,13 @@ import config
 import core.logger
 import core.decorators
 import core.loader
-import helpers.formatting
-import helpers.http_client
-import helpers.system_info
-import helpers.telegram_tools
 
-print("Importing all plugins...")
-import plugins.web_search
-import plugins.system
-import plugins.admin
-import plugins.afk
-import plugins.tools
-import plugins.media
-import plugins.fun
-import plugins.exec
-import plugins.help
+print("Dynamically discovering and importing all plugins...")
+plugin_files = list(config.PLUGIN_DIR.glob("*.py"))
+for f in plugin_files:
+    if not f.name.startswith("__"):
+        import importlib
+        importlib.import_module(f"plugins.{f.stem}")
 
 print(f"\n✅ Total registered commands: {len(core.decorators.COMMAND_REGISTRY)}")
 for cmd, meta in sorted(core.decorators.COMMAND_REGISTRY.items()):
