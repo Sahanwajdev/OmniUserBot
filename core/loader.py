@@ -37,12 +37,20 @@ def load_plugins(client) -> int:
             registered_in_module = 0
             for attr_name in dir(module):
                 attr = getattr(module, attr_name)
-                if callable(attr) and hasattr(attr, "event_filter"):
+                if not callable(attr):
+                    continue
+
+                if hasattr(attr, "event_filter"):
                     client.add_event_handler(attr, attr.event_filter)
                     LOADED_HANDLERS.append(attr)
                     registered_in_module += 1
+                elif hasattr(attr, "__tl.handlers"):
+                    for ev in getattr(attr, "__tl.handlers"):
+                        client.add_event_handler(attr, ev)
+                        LOADED_HANDLERS.append(attr)
+                        registered_in_module += 1
 
-            log.info(f"Loaded plugin: {file_path.stem} ({registered_in_module} commands)")
+            log.info(f"Loaded plugin: {file_path.stem} ({registered_in_module} handlers)")
             loaded_count += 1
         except Exception as e:
             log.error(f"Failed to load plugin '{file_path.stem}': {e}", exc_info=True)

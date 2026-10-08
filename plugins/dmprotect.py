@@ -31,7 +31,7 @@ def load_state():
                 "direct_block_msg",
                 "⛔ **Direct Messages are blocked on this account.** You have been directly blocked."
             )
-            DMPROTECT_STATE["allowed"] = set(data.get("allowed", []))
+            DMPROTECT_STATE["allowed"] = set(int(x) for x in data.get("allowed", []) if str(x).lstrip("-").isdigit())
         except Exception:
             pass
 
@@ -43,7 +43,7 @@ def save_state():
             "mode": DMPROTECT_STATE["mode"],
             "max_warns": DMPROTECT_STATE["max_warns"],
             "direct_block_msg": DMPROTECT_STATE["direct_block_msg"],
-            "allowed": list(DMPROTECT_STATE["allowed"]),
+            "allowed": [int(x) for x in DMPROTECT_STATE["allowed"]],
         }
         DMPROTECT_DATA_FILE.write_text(json.dumps(data, indent=2), encoding="utf-8")
     except Exception:
@@ -125,18 +125,29 @@ async def dm_protect_control(event):
 )
 async def allow_user(event):
     target, _ = await get_target_user(event)
-    if not target and event.is_private:
-        target = await event.get_chat()
+    target_id = None
+    target_name = "User"
 
-    if not target:
-        await event.reply_or_edit("❌ Specify user (@username or ID) or run command in private chat.")
+    if target:
+        target_id = target.id
+        target_name = getattr(target, "first_name", "User")
+    elif event.text_args.strip().lstrip("-").isdigit():
+        target_id = int(event.text_args.strip())
+        target_name = f"User ({target_id})"
+    elif event.is_private:
+        chat = await event.get_chat()
+        if chat:
+            target_id = chat.id
+            target_name = getattr(chat, "first_name", "User")
+
+    if not target_id:
+        await event.reply_or_edit("❌ Specify user (@username or ID), reply to a message, or run in private chat.")
         return
 
-    DMPROTECT_STATE["allowed"].add(target.id)
-    DMPROTECT_STATE["warns"].pop(target.id, None)
+    DMPROTECT_STATE["allowed"].add(int(target_id))
+    DMPROTECT_STATE["warns"].pop(int(target_id), None)
     save_state()
-    name = getattr(target, "first_name", "User")
-    await event.reply_or_edit(f"✅ **Allowed:** [{name}](tg://user?id={target.id}) (`{target.id}`) is added to whitelist and can DM freely.")
+    await event.reply_or_edit(f"✅ **Allowed:** [{target_name}](tg://user?id={target_id}) (`{target_id}`) added to whitelist and can DM freely.")
 
 
 @omni_cmd(
@@ -148,17 +159,28 @@ async def allow_user(event):
 )
 async def disallow_user(event):
     target, _ = await get_target_user(event)
-    if not target and event.is_private:
-        target = await event.get_chat()
+    target_id = None
+    target_name = "User"
 
-    if not target:
-        await event.reply_or_edit("❌ Specify user (@username or ID) or run command in private chat.")
+    if target:
+        target_id = target.id
+        target_name = getattr(target, "first_name", "User")
+    elif event.text_args.strip().lstrip("-").isdigit():
+        target_id = int(event.text_args.strip())
+        target_name = f"User ({target_id})"
+    elif event.is_private:
+        chat = await event.get_chat()
+        if chat:
+            target_id = chat.id
+            target_name = getattr(chat, "first_name", "User")
+
+    if not target_id:
+        await event.reply_or_edit("❌ Specify user (@username or ID), reply to a message, or run in private chat.")
         return
 
-    DMPROTECT_STATE["allowed"].discard(target.id)
+    DMPROTECT_STATE["allowed"].discard(int(target_id))
     save_state()
-    name = getattr(target, "first_name", "User")
-    await event.reply_or_edit(f"⛔ **Disallowed:** [{name}](tg://user?id={target.id}) removed from whitelist. DM Protect will now apply.")
+    await event.reply_or_edit(f"⛔ **Disallowed:** [{target_name}](tg://user?id={target_id}) (`{target_id}`) removed from whitelist. DM Protect will now apply.")
 
 
 @omni_cmd(
@@ -224,51 +246,91 @@ async def unblock_user(event):
 
 
 # Incoming DM Listener
-@events.register(events.NewMessage(incoming=True, func=lambda e: e.is_private))
 async def dm_protect_incoming_listener(event):
     if not DMPROTECT_STATE["enabled"]:
         return
 
-    sender = await event.get_sender()
-    if not sender or sender.bot or sender.is_self:
+    # Never process outgoing messages
+    if event.out:
         return
 
-    # Whitelist checks: Allowed list, Contact, Sudo
-    if (
-        sender.id in DMPROTECT_STATE["allowed"]
-        or sender.contact
-        or sender.id in config.SUDO_USERS
-    ):
+    # Only process private 1-on-1 chats
+    if not event.is_private:
         return
 
-    # DIRECT BLOCK MODE
-    if DMPROTECT_STATE["mode"] == "block":
+    sender_id = event.sender_id
+    if not sender_id:
+        return
+
+    client = event.client
+
+    # Never block owner or configured sudo users
+    me = client.me
+    if not me:
         try:
-            # Send block message
-            await event.reply(DMPROTECT_STATE["direct_block_msg"])
-            # Instantly block user
-            await event.client(BlockRequest(sender.id))
+            me = await client.get_me()
         except Exception:
             pass
+    if me and sender_id == me.id:
+        return
+    if sender_id in config.SUDO_USERS:
         return
 
-    # WARNING MODE
-    warns = DMPROTECT_STATE["warns"].get(sender.id, 0) + 1
-    DMPROTECT_STATE["warns"][sender.id] = warns
+    # Check whitelist (allowed users)
+    if int(sender_id) in DMPROTECT_STATE["allowed"]:
+        return
+
+    # Check if sender is in saved contacts or is a bot
+    sender = await event.get_sender()
+    if sender:
+        if getattr(sender, "is_self", False) or getattr(sender, "bot", False) or getattr(sender, "contact", False):
+            return
+
+    # Resolve input peer for reliable BlockRequest execution
+    try:
+        input_peer = await event.get_input_chat()
+    except Exception:
+        input_peer = sender_id
+
+    # 1. DIRECT BLOCK MODE (Instant block on first incoming DM)
+    if DMPROTECT_STATE["mode"] == "block":
+        try:
+            await event.reply(DMPROTECT_STATE["direct_block_msg"])
+        except Exception:
+            pass
+        try:
+            await client(BlockRequest(input_peer))
+            from core.logger import log
+            log.info(f"🚫 [DMProtect] Real-time DIRECT BLOCKED unauthorized user ID: {sender_id}")
+        except Exception as e:
+            from core.logger import log
+            log.error(f"[DMProtect] Failed to block {sender_id}: {e}")
+        return
+
+    # 2. WARNING MODE
+    warns = DMPROTECT_STATE["warns"].get(sender_id, 0) + 1
+    DMPROTECT_STATE["warns"][sender_id] = warns
     max_warns = DMPROTECT_STATE["max_warns"]
 
     if warns >= max_warns:
         try:
             await event.reply("🚫 **Spam limit exceeded.** You have been automatically blocked.")
-            await event.client(BlockRequest(sender.id))
+            await client(BlockRequest(input_peer))
+            from core.logger import log
+            log.info(f"🚫 [DMProtect] User ID {sender_id} exceeded warning limit and was blocked.")
         except Exception:
             pass
         return
 
     # Send warning
+    sender_name = getattr(sender, "first_name", "User") if sender else "User"
     msg_text = (
         f"⚠️ **DM Notice from OmniUserBot**\n\n"
-        f"Hello [{sender.first_name}](tg://user?id={sender.id}), direct messages are restricted.\n"
+        f"Hello [{sender_name}](tg://user?id={sender_id}), direct messages are restricted.\n"
         f"Do not spam. You have **{warns}/{max_warns}** warnings before being blocked."
     )
     await event.reply(msg_text)
+
+
+# Explicit event filter attachment for real-time dispatching on incoming private messages
+dm_protect_incoming_listener.event_filter = events.NewMessage(incoming=True, func=lambda e: e.is_private)

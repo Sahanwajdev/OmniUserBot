@@ -68,6 +68,6 @@ async def unflip_table_cmd(event):
     await event.reply_or_edit("┬─┬ノ( º _ ºノ)")
 
 
-@omni_cmd(pattern="facepalm", desc="Facepalm reaction.", usage=".facepalm", category="Fun")
+@omni_cmd(pattern="facepalm", desc="Facepalm reaction.", usage=".facepalm", category="Fun", aliases=["faceplam"])
 async def facepalm_cmd(event):
     await event.reply_or_edit("🤦‍♂️")

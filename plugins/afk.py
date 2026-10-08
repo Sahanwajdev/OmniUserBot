@@ -88,3 +88,7 @@ async def afk_incoming_listener(event):
         f"_I will reply to you as soon as I'm back._"
     )
     await event.reply(text)
+
+
+afk_outgoing_listener.event_filter = events.NewMessage(outgoing=True)
+afk_incoming_listener.event_filter = events.NewMessage(incoming=True)

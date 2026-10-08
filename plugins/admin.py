@@ -86,8 +86,13 @@ async def pin_message(event):
         return
 
     silent = "loud" not in event.text_args.lower()
-    await event.client.pin_message(event.chat_id, reply.id, notify=not silent)
-    await event.reply_or_edit("📌 **Message pinned successfully!**")
+    try:
+        await event.client.pin_message(event.chat_id, reply.id, notify=not silent)
+        await event.reply_or_edit("📌 **Message pinned successfully!**")
+    except ChatAdminRequiredError:
+        await event.reply_or_edit("❌ Administrator privileges with pin rights are required in this chat.")
+    except Exception as e:
+        await event.reply_or_edit(f"❌ Failed to pin: `{e}`")
 
 
 @omni_cmd(
@@ -97,18 +102,23 @@ async def pin_message(event):
     category="Admin"
 )
 async def unpin_message(event):
-    if event.text_args.lower() == "all":
-        await event.client.unpin_message(event.chat_id)
-        await event.reply_or_edit("📌 **All pinned messages unpinned.**")
-        return
+    try:
+        if event.text_args.lower() == "all":
+            await event.client.unpin_message(event.chat_id)
+            await event.reply_or_edit("📌 **All pinned messages unpinned.**")
+            return
 
-    reply = await event.get_reply_message()
-    if not reply:
-        await event.reply_or_edit("❌ Reply to a pinned message to unpin it.")
-        return
+        reply = await event.get_reply_message()
+        if not reply:
+            await event.reply_or_edit("❌ Reply to a pinned message to unpin it.")
+            return
 
-    await event.client.unpin_message(event.chat_id, reply.id)
-    await event.reply_or_edit("📌 **Message unpinned.**")
+        await event.client.unpin_message(event.chat_id, reply.id)
+        await event.reply_or_edit("📌 **Message unpinned.**")
+    except ChatAdminRequiredError:
+        await event.reply_or_edit("❌ Administrator privileges with pin rights are required in this chat.")
+    except Exception as e:
+        await event.reply_or_edit(f"❌ Failed to unpin: `{e}`")
 
 
 @omni_cmd(

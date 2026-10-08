@@ -221,3 +221,6 @@ async def chat_filter_listener(event):
         if keyword in text_lower.split():
             await event.reply(reply_text)
             break
+
+
+chat_filter_listener.event_filter = events.NewMessage(incoming=True)

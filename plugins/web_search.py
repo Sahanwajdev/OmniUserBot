@@ -130,16 +130,17 @@ async def wiki_search(event):
     msg = await event.reply_or_edit(f"📖 **Querying Wikipedia for:** `{query}`...")
     encoded = urllib.parse.quote(query.replace(" ", "_"))
     url = f"https://en.wikipedia.org/api/rest_v1/page/summary/{encoded}"
+    wiki_headers = {"User-Agent": "OmniUserBot/1.0 (https://github.com/Sahanwajdev/OmniUserBot; contact: userbot@telegram.org)"}
 
-    data = await fetch_json(url)
+    data = await fetch_json(url, headers=wiki_headers)
     if not data or data.get("type") == "https://mediawiki.org/wiki/HyperSwitch/errors/not_found":
         # Search API fallback
         search_url = f"https://en.wikipedia.org/w/api.php?action=opensearch&search={urllib.parse.quote(query)}&limit=1&namespace=0&format=json"
-        s_data = await fetch_json(search_url)
+        s_data = await fetch_json(search_url, headers=wiki_headers)
         if s_data and len(s_data) >= 4 and s_data[1]:
             first_title = s_data[1][0]
             enc2 = urllib.parse.quote(first_title.replace(" ", "_"))
-            data = await fetch_json(f"https://en.wikipedia.org/api/rest_v1/page/summary/{enc2}")
+            data = await fetch_json(f"https://en.wikipedia.org/api/rest_v1/page/summary/{enc2}", headers=wiki_headers)
 
     if not data or not data.get("extract"):
         await msg.edit(f"❌ No Wikipedia article found for: `{query}`")
@@ -326,7 +327,8 @@ async def weather_info(event):
     msg = await event.reply_or_edit(f"🌦️ **Checking weather for:** `{city}`...")
 
     url = f"https://wttr.in/{urllib.parse.quote(city)}?format=j1"
-    data = await fetch_json(url)
+    weather_headers = {"User-Agent": "curl/7.68.0"}
+    data = await fetch_json(url, headers=weather_headers)
 
     if not data or not data.get("current_condition"):
         await msg.edit(f"❌ Weather data unavailable for `{city}`.")

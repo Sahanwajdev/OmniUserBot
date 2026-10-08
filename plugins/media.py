@@ -54,26 +54,40 @@ async def youtube_search(event):
 
 @omni_cmd(
     pattern="ytdl",
-    desc="Downloads YouTube video or audio directly using yt-dlp.",
-    usage=".ytdl <url> [audio/video]",
-    category="Media"
+    desc="Downloads YouTube video or audio by URL or song name using yt-dlp.",
+    usage=".ytdl <url or search query> [audio/video]",
+    category="Media",
+    aliases=["ytdlp", "song", "video", "yta"]
 )
 async def youtube_download(event):
-    args = event.text_args.strip().split()
-    if not args:
-        await event.reply_or_edit("📥 **Usage:** `.ytdl <url> [audio/video]`")
+    query = event.text_args.strip()
+    if not query:
+        await event.reply_or_edit("📥 **Usage:** `.ytdl <url or song name>`\nExamples:\n• `.ytdl tum hi ho`\n• `.ytdl https://youtu.be/... audio`")
         return
 
-    url = args[0]
-    is_audio = len(args) > 1 and "audio" in args[1].lower()
+    # Check if audio format requested
+    cmd_name = (event.raw_text or "").split()[0].lstrip("".join(config.COMMAND_PREFIXES)).lower()
+    is_audio = cmd_name in ("song", "yta") or "audio" in query.lower()
 
-    msg = await event.reply_or_edit("📥 **Downloading media via yt-dlp...**")
+    # Clean query if 'audio' was passed at the end
+    clean_query = query
+    if is_audio and clean_query.lower().endswith(" audio"):
+        clean_query = clean_query[:-6].strip()
+
+    # Determine whether input is URL or search query
+    target = clean_query
+    if not (target.startswith("http://") or target.startswith("https://")):
+        target = f"ytsearch1:{clean_query}"
+
+    media_type = "Audio (MP3)" if is_audio else "Video (MP4)"
+    msg = await event.reply_or_edit(f"📥 **Downloading {media_type}:** `{clean_query[:50]}`...")
     out_tmpl = str(config.DOWNLOAD_DIR / f"%(id)s.%(ext)s")
 
     opts = {
         "outtmpl": out_tmpl,
         "quiet": True,
         "max_filesize": 50 * 1024 * 1024,  # 50MB telegram upload limit
+        "noplaylist": True,
     }
     if is_audio:
         opts["format"] = "bestaudio/best"
@@ -83,27 +97,43 @@ async def youtube_download(event):
     try:
         loop = asyncio.get_event_loop()
         with yt_dlp.YoutubeDL(opts) as ydl:
-            info = await loop.run_in_executor(None, lambda: ydl.extract_info(url, download=True))
+            info = await loop.run_in_executor(None, lambda: ydl.extract_info(target, download=True))
+            if "entries" in info and info["entries"]:
+                info = info["entries"][0]
             filename = ydl.prepare_filename(info)
 
         if not os.path.exists(filename):
             await msg.edit("❌ Download finished but file was not found.")
             return
 
+        title = info.get("title", "Audio" if is_audio else "Video")
+        uploader = info.get("uploader", "YouTube")
+
         await msg.edit("📤 **Uploading to Telegram...**")
-        await event.client.send_file(
-            event.chat_id,
-            file=filename,
-            caption=f"🎥 **{info.get('title', 'Video')}**",
-            reply_to=event.id
-        )
+        if is_audio:
+            await event.client.send_file(
+                event.chat_id,
+                file=filename,
+                caption=f"🎵 **{title}**\n👤 `{uploader}`",
+                reply_to=event.id
+            )
+        else:
+            await event.client.send_file(
+                event.chat_id,
+                file=filename,
+                caption=f"🎥 **{title}**\n👤 `{uploader}`",
+                reply_to=event.id
+            )
+
         if event.out:
             await event.delete()
         else:
             await msg.delete()
-        os.remove(filename)
+
+        if os.path.exists(filename):
+            os.remove(filename)
     except Exception as e:
-        await msg.edit(f"❌ Failed to download/send video: `{e}`")
+        await msg.edit(f"❌ Failed to download/send media: `{e}`")
 
 
 @omni_cmd(

@@ -48,17 +48,43 @@ async def translate_text(event):
         return
 
     msg = await event.reply_or_edit(f"🌐 **Translating into `{target_lang}`...**")
-    translated = None
 
-    if HAS_TRANSLATOR:
-        # Multi-engine fallback: Try MyMemory first, fallback to GoogleTranslator
+    COMMON_LOCALES = {
+        "en": "en-US", "es": "es-ES", "fr": "fr-FR", "de": "de-DE", "hi": "hi-IN",
+        "ar": "ar-SA", "zh": "zh-CN", "ja": "ja-JP", "it": "it-IT", "pt": "pt-PT",
+        "ko": "ko-KR", "ru": "ru-RU", "tr": "tr-TR", "nl": "nl-NL", "id": "id-ID",
+        "ur": "ur-PK", "bn": "bn-IN", "fa": "fa-IR", "pl": "pl-PL", "uk": "uk-UA"
+    }
+
+    def _sync_translate(text: str, lang: str):
+        import urllib.request
+        import urllib.parse
+        import json
+
+        # Engine 1: Google Translate single endpoint
         try:
-            translated = MyMemoryTranslator(source="auto", target=target_lang).translate(text_to_tr)
+            url = f"https://translate.googleapis.com/translate_a/single?client=gtx&sl=auto&tl={lang}&dt=t&q={urllib.parse.quote(text)}"
+            req = urllib.request.Request(
+                url,
+                headers={"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"}
+            )
+            with urllib.request.urlopen(req, timeout=8) as resp:
+                data = json.loads(resp.read().decode("utf-8"))
+                if data and isinstance(data, list) and data[0]:
+                    return "".join(item[0] for item in data[0] if item and item[0])
         except Exception:
+            pass
+
+        # Engine 2: MyMemoryTranslator fallback
+        if HAS_TRANSLATOR:
             try:
-                translated = GoogleTranslator(source="auto", target=target_lang).translate(text_to_tr)
-            except Exception as e:
-                translated = None
+                target_locale = COMMON_LOCALES.get(lang.lower(), lang)
+                return MyMemoryTranslator(source="en-US", target=target_locale).translate(text)
+            except Exception:
+                pass
+        return None
+
+    translated = await asyncio.to_thread(_sync_translate, text_to_tr, target_lang)
 
     if not translated:
         await msg.edit("❌ Failed to translate text. Check language code (e.g. `en`, `es`, `fr`, `de`, `hi`, `ar`).")

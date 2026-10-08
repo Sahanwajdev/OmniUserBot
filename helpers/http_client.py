@@ -29,7 +29,7 @@ class AsyncHttpClient:
         try:
             async with session.get(url, headers=headers, params=params) as resp:
                 if resp.status == 200:
-                    return await resp.json()
+                    return await resp.json(content_type=None)
         except Exception:
             return None
         return None

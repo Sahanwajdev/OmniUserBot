@@ -12,6 +12,10 @@ __pycache__/
 omni_userbot.session
 omni_userbot.session-journal
 
+# Runtime user data & storage
+dmprotect.json
+notes_filters.json
+
 # Downloads and temp files
 downloads/*
 !downloads/.gitkeep
