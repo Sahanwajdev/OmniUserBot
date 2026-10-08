@@ -15,6 +15,7 @@ omni_userbot.session-journal
 # Runtime user data & storage
 dmprotect.json
 notes_filters.json
+profile_backup.json
 
 # Downloads and temp files
 downloads/*
