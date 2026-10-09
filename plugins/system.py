@@ -22,9 +22,13 @@ async def bot_alive(event):
     prefix = "".join(config.COMMAND_PREFIXES)
     total_cmds = len(client.commands)
 
+    me_name = getattr(client.me, "first_name", "Owner") if client.me else "Owner"
+    me_id = getattr(client.me, "id", "") if client.me else ""
+    owner_str = f"[{me_name}](tg://user?id={me_id})" if me_id else me_name
+
     text = (
         f"**{config.ALIVE_EMOJI} {config.BOT_NAME} is Online!**\n\n"
-        f"• **Owner:** [{client.me.first_name}](tg://user?id={client.me.id})\n"
+        f"• **Owner:** {owner_str}\n"
         f"• **Uptime:** `{uptime}`\n"
         f"• **Prefix:** `{prefix}`\n"
         f"• **Commands:** `{total_cmds} Loaded`\n"
