@@ -47,42 +47,41 @@ def _get_categorized_commands(client):
 
 
 def _build_hub_view(client):
-    total_cmds = len(client.commands) if (client and client.commands) else 102
+    total_cmds = len(client.commands) if (client and client.commands) else 122
     categorized = _get_categorized_commands(client)
 
     caption = "hyy qt"
 
-    # Modern 3-column inline button layout
-    grid_cats = [
-        "Admin", "Media", "Security",
-        "Tools", "Tagger", "Profile",
-        "Web Search", "Fun", "Notes & Filters",
-        "System", "Developer", "Automation",
-        "General"
+    # Perfect for mobile: Balanced 2-column layout with spacious, thumb-friendly tap targets
+    pairs = [
+        ("Admin", "Media"),
+        ("Security", "Tools"),
+        ("Tagger", "Profile"),
+        ("Web Search", "Fun"),
+        ("Notes & Filters", "System"),
+        ("Developer", "Automation"),
+        ("General", None),
     ]
 
     buttons = []
-    row = []
-    for cat in grid_cats:
-        if cat in categorized:
-            count = len(categorized[cat])
-            short_name = "Notes" if cat == "Notes & Filters" else ("Search" if cat == "Web Search" else cat)
-            safe_key = cat.lower().replace(" ", "_").replace("&", "and")
-            cb_data = f"hcat_{safe_key}".encode("utf-8")[:64]
-            row.append(Button.inline(f"{short_name} ({count:02d})", cb_data))
-            if len(row) == 3:
-                buttons.append(row)
-                row = []
+    for c1, c2 in pairs:
+        row = []
+        if c1 in categorized:
+            cnt1 = len(categorized[c1])
+            k1 = c1.lower().replace(" ", "_").replace("&", "and")
+            row.append(Button.inline(f"{c1} ({cnt1:02d})", f"hcat_{k1}".encode()))
+        if c2 and c2 in categorized:
+            cnt2 = len(categorized[c2])
+            k2 = c2.lower().replace(" ", "_").replace("&", "and")
+            row.append(Button.inline(f"{c2} ({cnt2:02d})", f"hcat_{k2}".encode()))
+        elif c2 is None:
+            # Pair General with All Commands
+            row.append(Button.inline(f"All Commands ({total_cmds})", b"hcat_all"))
+        if row:
+            buttons.append(row)
 
-    if row:
-        row.append(Button.inline(f"All ({total_cmds})", b"hcat_all"))
-        buttons.append(row)
-    else:
-        buttons.append([Button.inline(f"All Commands ({total_cmds})", b"hcat_all")])
-
-    buttons.append([
-        Button.inline("Close Menu", b"h_close")
-    ])
+    # Full-width Close Menu button at bottom
+    buttons.append([Button.inline("Close Menu", b"h_close")])
 
     return caption, buttons
 
@@ -113,12 +112,16 @@ def _build_category_view(client, cat_key: str):
         "╰──────────────────────────────────╯\n"
     ]
 
-    for m in sorted(cmds, key=lambda x: x["name"]):
-        cname = m["name"]
-        desc = m.get("description", "No description.")
-        if len(desc) > 30:
-            desc = desc[:28] + ".."
-        lines.append(f"• `{prefix}{cname}` — _{desc}_")
+    if len(cmds) > 16:
+        cmd_names = [f"`{prefix}{m['name']}`" for m in sorted(cmds, key=lambda x: x["name"])]
+        lines.append("• " + ", ".join(cmd_names))
+    else:
+        for m in sorted(cmds, key=lambda x: x["name"]):
+            cname = m["name"]
+            desc = m.get("description", "No description.")
+            if len(desc) > 30:
+                desc = desc[:28] + ".."
+            lines.append(f"• `{prefix}{cname}` — _{desc}_")
 
     caption = "\n".join(lines)
     if len(caption) > 1020:

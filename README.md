@@ -157,24 +157,24 @@ Configure parameters in `.env` or as environment variables in your cloud provide
 
 ## Module Index
 
-The system includes 102 integrated commands organized into 13 modules:
+The system includes 122 integrated commands organized into 13 modules:
 
 <div align="center">
 
 | Module | Count | Command Highlights |
 | :--- | :---: | :--- |
 | **Admin** | 17 | `.del`, `.purge`, `.pin`, `.unpin`, `.ban`, `.unban`, `.mute`, `.unmute`, `.kick`, `.promote`, `.demote`, `.zombies`, `.title`, `.invite`, `.gban`, `.ungban` |
-| **Security** | 8 | `.dmprotect on/off/mode`, `.allow`, `.disallow`, `.allowed`, `.sessions`, `.killall` |
-| **Media** | 8 | `.ytdl [url]`, `.song [query]`, `.video [query]`, `.yt [query]`, `.stoi` |
-| **Tools** | 12 | `.leftall`, `.readall`, `.cat`, `.dns`, `.shorten`, `.unshorten`, `.paste`, `.speedtest` |
-| **Tagger** | 9 | `.tagall`, `.tagshari`, `.taggm`, `.taggn`, `.taglove`, `.tagcancel` |
-| **Profile** | 6 | `.clone [user]`, `.revert`, `.setname`, `.setbio`, `.setpfp`, `.delpfp` |
+| **Tools** | 26 | `.tr [lang]`, `.tts [lang]`, `.currency`, `.crypto`, `.whois`, `.sg`, `.makeqr`, `.getqr`, `.barcode`, `.time`, `.calendar`, `.ss`, `.stats`, `.hash`, `.base64`, `.direct`, `.fileext`, `.leftall`, `.readall`, `.cat`, `.dns`, `.shorten`, `.unshorten`, `.paste`, `.speedtest` |
+| **Fun & Memes** | 16 | `.sticklet`, `.q`, `.packinfo`, `.coin`, `.mock`, `.vapor`, `.zal`, `.type`, `.slap`, `.shrug`, `.tableflip`, `.unflip`, `.dice`, `.meme`, `.pat` |
 | **Web Search** | 14 | `.ddg`, `.google`, `.wiki`, `.lyrics`, `.news`, `.weather`, `.ud` |
+| **Media** | 9 | `.carbon`, `.karb`, `.ytdl [url]`, `.song [query]`, `.video [query]`, `.yt [query]`, `.stoi` |
+| **Tagger** | 9 | `.tagall`, `.tagshari`, `.taggm`, `.taggn`, `.taglove`, `.tagcancel` |
+| **Security** | 8 | `.dmprotect on/off/mode`, `.allow`, `.disallow`, `.allowed`, `.sessions`, `.killall` |
 | **Notes & Filters** | 7 | `.save`, `.get`, `.clear`, `.notes`, `.filter`, `.stop`, `.filters` |
-| **Fun & Memes** | 16 | `.type`, `.slap`, `.shrug`, `.tableflip`, `.unflip`, `.dice`, `.meme`, `.pat` |
+| **Profile** | 6 | `.clone [user]`, `.revert`, `.setname`, `.setbio`, `.setpfp`, `.delpfp` |
 | **System** | 6 | `.alive`, `.ping`, `.sysinfo`, `.setprefix`, `.reload`, `.restart` |
-| **Automation** | 1 | `.afk [reason]` |
 | **Developer** | 2 | `.eval [code]`, `.sh [cmd]` |
+| **Automation** | 1 | `.afk [reason]` |
 | **General** | 1 | `.help [category/command/all]` |
 
 </div>
