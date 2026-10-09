@@ -72,6 +72,10 @@ async def main():
     # Start assistant bot for inline queries and inline buttons
     await bot.start_assistant_bot()
 
+    # Start background web server for Cloudflare / health probes
+    from core.web_server import start_web_server
+    web_runner = await start_web_server(bot)
+
     # Load all plugins
     loaded_count = load_plugins(bot)
     log.info(f"Successfully loaded {loaded_count} plugin modules with {len(bot.commands)} commands.")
@@ -99,6 +103,8 @@ async def main():
     except (KeyboardInterrupt, SystemExit):
         log.info("Stopping OmniUserBot...")
     finally:
+        if "web_runner" in locals() and web_runner:
+            await web_runner.cleanup()
         if bot.is_connected():
             await bot.disconnect()
         log.info("OmniUserBot stopped cleanly.")

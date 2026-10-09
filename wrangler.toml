@@ -1,0 +1,18 @@
+name = "omniuserbot"
+main = "cloudflare/worker.js"
+compatibility_date = "2024-11-01"
+compatibility_flags = ["nodejs_compat"]
+
+# Cloudflare Containers configuration
+# Deploys your Dockerfile directly to Cloudflare edge
+[containers]
+dockerfile = "Dockerfile"
+max_instances = 1
+
+# Cloudflare Cron Triggers: pings health endpoint every 5 minutes to ensure 24/7 uptime
+[triggers]
+crons = ["*/5 * * * *"]
+
+[vars]
+SERVICE_NAME = "OmniUserBot"
+PORT = "8080"

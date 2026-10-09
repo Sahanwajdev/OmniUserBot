@@ -23,5 +23,9 @@ RUN pip install --no-cache-dir -r requirements.txt
 # Copy userbot source code
 COPY . .
 
+# Cloudflare / Web health check port
+ENV PORT=8080
+EXPOSE 8080
+
 # Run the userbot
 CMD ["python", "main.py"]

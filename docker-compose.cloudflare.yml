@@ -1,0 +1,26 @@
+version: "3.8"
+
+services:
+  omniuserbot:
+    build: .
+    container_name: omni_userbot
+    restart: unless-stopped
+    env_file:
+      - .env
+    environment:
+      - PORT=8080
+    volumes:
+      - ./downloads:/app/downloads
+    ports:
+      - "8080:8080"
+
+  # Cloudflare Tunnel: Exposes the userbot via Cloudflare's zero-trust network without open ports
+  cloudflared:
+    image: cloudflare/cloudflared:latest
+    container_name: cloudflare_tunnel
+    restart: unless-stopped
+    command: tunnel --no-autoupdate run
+    environment:
+      - TUNNEL_TOKEN=${CLOUDFLARE_TUNNEL_TOKEN}
+    depends_on:
+      - omniuserbot
